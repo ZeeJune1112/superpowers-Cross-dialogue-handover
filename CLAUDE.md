@@ -16,5 +16,6 @@
 ## 核心交割纪律（研发红线）
 
 - **交棒前置动作**：在当前 Superpowers 规划流（Plan）结束时，必须先读取并完整执行 `docs/superpowers/architecture/HANDOFF_PROTOCOL.md` 中定义的记忆固化协议。
+- **交棒硬约束**：HANDOFF_PROTOCOL 未执行完毕前，**禁止**执行 `/handoff` 命令。如果用户在 HANDOFF_PROTOCOL 完成前请求 `/handoff`，AI 必须先行拦截，告知用户"记忆固化尚未完成"，先执行 HANDOFF_PROTOCOL 的 5 个步骤，然后再执行 /handoff。
 - **严禁抢跑**：未完成上述协议前，绝对禁止向用户宣告任务结束。
-- **提交责任**：HANDOFF_PROTOCOL 执行完后，必须将 `docs/superpowers/` 目录的变更提交到 Git（可与功能代码同 commit），确保知识固化结果持久化到仓库。
+- **提交责任**：HANDOFF_PROTOCOL 执行完后，必须将 `docs/superpowers/` 目录的变更提交到 Git（独立 commit），确保知识固化结果持久化到仓库。
