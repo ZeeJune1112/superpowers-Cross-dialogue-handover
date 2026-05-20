@@ -173,3 +173,56 @@ def draw_game(screen, game, fonts):
         continue_text = fonts["overlay_sub"].render("Press C to continue", True, (119, 110, 101))
         continue_rect = continue_text.get_rect(center=(250, 350))
         screen.blit(continue_text, continue_rect)
+
+
+# === Main ===
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    pygame.display.set_caption("2048")
+    clock = pygame.time.Clock()
+
+    fonts = {
+        "title": pygame.font.SysFont("Arial", 42, bold=True),
+        "score": pygame.font.SysFont("Arial", 28),
+        "overlay_title": pygame.font.SysFont("Arial", 52, bold=True),
+        "overlay_sub": pygame.font.SysFont("Arial", 28),
+    }
+    for size in (48, 36, 28, 22):
+        fonts[size] = pygame.font.SysFont("Arial", size, bold=True)
+
+    game = Game2048()
+    running = True
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key == pygame.K_r:
+                    game.restart()
+                elif event.key == pygame.K_c and game.won:
+                    game.keep_playing = True
+                elif not game.is_game_over() and not (game.won and not game.keep_playing):
+                    if event.key == pygame.K_LEFT:
+                        game.move(0)
+                    elif event.key == pygame.K_RIGHT:
+                        game.move(1)
+                    elif event.key == pygame.K_UP:
+                        game.move(2)
+                    elif event.key == pygame.K_DOWN:
+                        game.move(3)
+
+        draw_game(screen, game, fonts)
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    main()
