@@ -1,34 +1,33 @@
 # Superpowers 跨窗口记忆固化协议
 
-本协议是 CLAUDE.md 中「核心交割纪律」的具体实现，解决两个问题：
+本协议解决两个问题：
 1. **固化**：当前窗口的确定性知识（规划产出、功能成果、踩坑经验）在关闭前落盘
-2. **预热**：新窗口启动时（通过 `/continue-handoff` 触发）快速加载这些知识，避免重复踩坑
+2. **预热**：新窗口启动时通过 `/continue-handoff` 快速加载这些知识，避免重复踩坑
 
-> **CLAUDE.md 中的规则指向本文件，本文件指向 INDEX.md。continue-handoff 技能在新窗口触发时读取 INDEX.md 完成预热。四层关系：**
-> ```
-> CLAUDE.md ──(指针)──→ HANDOFF_PROTOCOL.md  ← 交棒时执行（写入知识）
-> CLAUDE.md ──(指针)──→ INDEX.md              ← 预热时读取（由 continue-handoff 技能自动执行）
-> HANDOFF_PROTOCOL.md ──(更新)──→ INDEX.md     ← 本协议维护索引
-> /continue-handoff ──(读取)──→ INDEX.md        ← 新窗口恢复入口
-> ```
+> **四层关系**：
+> - CLAUDE.md ──指向──→ 本文件（写入知识） + INDEX.md（读取知识）
+> - 本文件 ──更新──→ INDEX.md
+> - `/continue-handoff` skill ──读取──→ INDEX.md（预热入口）
+> - `/handoff` skill ──写入──→ plan 的 Handoff Context（动态状态交接，与本协议互补）
+>
+> 本协议负责**确定性知识**（features、pitfalls、INDEX.md），/handoff 负责**动态状态**（当前进度、待办队列）。两者各司其职、缺一不可。
 
 ---
 
 ## 0. 环境检测与初始化
 
 ### 环境检测
-执行协议前，先判断当前环境：
 
 | 检测方式 | 命令 | 结果 |
 |----------|------|------|
 | Git 仓库 | `git rev-parse --is-inside-work-tree` | 输出 `true` → 走 Git 流程 |
-| 非 Git | 命令失败或输出错误 | 走非 Git 流程 |
+| 非 Git | 命令失败 | 走非 Git 流程 |
 
 两种流程的区别仅在第 1 步（审查改动范围）和第 4 步（Git 提交），其余步骤完全相同。
 
 ### 首次使用初始化
 
-以下条件按需创建，缺失任何一项都不阻塞流程——创建即可继续：
+以下条件按需创建，缺失任何一项都**不阻塞流程**——创建即可继续：
 
 | 检查项 | 不存在时的操作 |
 |--------|---------------|
@@ -58,18 +57,21 @@
 |------|------|----------|
 ```
 
+> **注意**：目录和 INDEX.md 的创建**仅由本协议负责**。`/continue-handoff` skill 只读取已有知识，不做自动创建，避免两处初始化逻辑产生竞态。
+
 ---
 
 ## 1. 审查改动范围
 
 ### Git 流程
-1. `git diff --stat` — 查看本次窗口改动了哪些文件
-2. `git diff` — 查看具体改动内容
-3. 筛选：聚焦于生产代码变更、配置变更、依赖变更、文档产出（spec/plan/feature/pitfall）。忽略临时性内容（如 `console.log` 调试行、被后续 commit 覆盖的中间状态文件）
+1. `git status --short` — 查看所有变更（含 untracked 文件）
+2. `git diff --stat` — 查看已跟踪文件的改动量
+3. `git diff` — 查看具体改动内容
+4. 筛选：聚焦于生产代码变更、配置变更、依赖变更、文档产出（spec/plan/feature/pitfall）。忽略临时性内容（如 `console.log` 调试行、被后续 commit 覆盖的中间状态文件）
 
 ### 非 Git 流程
-1. 回顾本次窗口对话，列出实际创建或修改的文件
-2. 回顾本次窗口中遇到的错误、反复调试的环节
+1. 回顾本次窗口对话中**实际创建或修改**的文件（以 Write/Edit 工具调用记录为准）
+2. 回顾本次窗口中遇到的**错误和反复调试**的环节
 3. 筛选：同上，聚焦确定性知识，忽略临时调试代码
 
 ---
@@ -82,13 +84,14 @@
 - **触发条件**：实现了新功能或重构了公共模块，且已通过测试验证
 - **文件命名**：`YYYY-MM-DD-<主题>.md`
 - **内容要求**：功能概述、关键设计决策、核心文件路径
+- **补充功能**：若为已有功能的增量补充（如加了实时时钟），直接更新已有 feature 文档追加设计决策即可，无需新建文件
 
 ### 写入 `docs/superpowers/architecture/pitfalls/`（坑点归档）
 - **触发条件**：攻克了隐蔽 Bug、配置暗坑、环境问题 **且用户明确确认要记录**
-- **触发流程**：遇到问题 → `/superpowers:systematic-debugging` 修复 → 修复完毕 → AI 主动询问"是否将此坑点写入文档？" → 用户确认 → 写入
+- **触发流程**：遇到问题 → 修复 → AI 主动询问"是否将此坑点写入文档？" → 用户确认 → 写入
 - **文件命名**：`YYYY-MM-DD-<主题>.md`
 - **内容要求**：问题现象、根因分析、确定性规避手段
-- **重要**：与 features 不同，pitfalls 必须经用户人工确认后才能写入。AI 不得在未经确认的情况下自动创建 pitfall 文档。用户有权判断某个问题是否具有"未来会重复踩坑"的归档价值。
+- **重要**：AI 不得在未经用户确认的情况下自动创建 pitfall 文档。用户有权判断某个问题是否具有"未来会重复踩坑"的归档价值。
 
 ### 无额外落盘内容时
 如果本次窗口未产生 features 或 pitfalls，跳过本步骤，直接进入第 3 步。不要为了"完成步骤"而写入低价值内容。
@@ -104,7 +107,7 @@
 ### 追加规则
 - 在 INDEX.md 对应分区表格的末尾追加新行
 - 路径使用相对于 `docs/superpowers/` 的路径
-- 追加前先检查：如果已有相同「日期 + 主题」的行，跳过不重复添加
+- 追加前先检查：如果已有相同「日期 + 主题」的行，跳过不重复添加（以日期和主题的**完全匹配**为准，忽略路径大小写差异）
 - 如果 INDEX.md 中对应分区表格不存在，按第 0 步的模板补齐
 
 ### 产出类型 → 索引分区映射
@@ -129,9 +132,10 @@
 ## 4. Git 提交（仅 Git 环境）
 
 如果是 Git 仓库，必须完成以下两步：
+
 ```bash
 git add docs/superpowers/
-git commit -m "docs: 更新项目知识索引与架构文档"
+git commit -m "docs: 更新项目知识索引与架构文档（HANDOFF_PROTOCOL）"
 ```
 
 非 Git 环境跳过此步。
@@ -146,52 +150,33 @@ git commit -m "docs: 更新项目知识索引与架构文档"
 
 > 当前窗口的架构沉淀与防呆经验已安全落盘并提交。您现在可以执行 `/handoff` 命令进行状态交接。
 
-**注意**：`/handoff` 是 superpowers 提供的用户命令，负责将当前任务的动态状态（进行到哪一步、待办队列）写入 plan 文件。本协议负责在此之前完成确定性知识（features、pitfalls、INDEX.md）的固化落盘。两者各司其职、缺一不可。
-
 ---
 
-## 6. 遗漏检测机制（供 continue-handoff 使用）
+## 6. 遗漏检测机制（供 /continue-handoff 使用）
 
-本协议是否已执行，不会在文件系统中写入专用标记文件。continue-handoff 技能通过以下方式检测上次是否遗漏了 HANDOFF_PROTOCOL：
+本协议是否已执行，通过 INDEX.md 与实际文件的差距来判断（不使用专用标记文件）：
 
 ```
-检测方法: 对比 INDEX.md 索引 vs 目录实际文件
-
 specs/ 或 plans/ 目录存在 .md 文件
   AND
 INDEX.md「规划产出」表中缺少这些文件的条目
   →
 上次窗口的 HANDOFF_PROTOCOL 被跳过
   →
-continue-handoff 回溯执行本协议（至少补全 INDEX.md 索引）
+/continue-handoff 触发回溯执行（补全 INDEX.md 索引）
 ```
 
-**为什么不用专用标记文件**：标记文件会引入状态不一致风险（标记存在但索引过期）。以 INDEX.md 与实际文件的差距作为信号，本身就是最真实的完成状态。无需额外标记。
+如果缺失的是 feature/pitfall 文档本身（不只是索引条目），`/continue-handoff` 在初始化报告中标注 `(Missing Docs)` 提醒用户——这些文档包含上下文相关的设计决策，只有当时的窗口能撰写。
 
 ---
 
-## 附：新窗口预热流程
+## 附：与其他组件的职责边界
 
-新窗口触发 `/continue-handoff` 后，continue-handoff 技能和 CLAUDE.md 预热协议共同完成以下流程：
+| 组件 | 职责 | 触发时机 |
+|------|------|---------|
+| 本协议 (HANDOFF_PROTOCOL) | 确定性知识固化（features/pitfalls + INDEX.md + Git commit） | Plan 执行完毕、功能确认完成时 |
+| `/handoff` skill | 动态状态交接（当前进度写入 plan 的 Handoff Context） | 窗口关闭前（需先完成本协议） |
+| `/continue-handoff` skill | 新窗口预热（读取 INDEX.md + plan 恢复上下文） | 新窗口启动时 |
+| CLAUDE.md | 入口规则（定义预热协议 + 交割纪律 + 语言约定） | 始终生效 |
 
-```
-/continue-handoff 触发
-  ↓
-continue-handoff 技能第 0 步：读取 INDEX.md
-  ↓ INDEX.md 存在
-按索引表格逐条读取 specs/  plans/  features/  pitfalls/
-  ↓ INDEX.md 缺失/空
-扫描并逐个读取四个目录中的所有 .md 文件
-  ↓ 目录也为空
-跳过预热，依赖 handoff 上下文继续
-  ↓
-continue-handoff 技能第 1 步：挂载 Plan 文件并提取 Handoff Context
-  ↓
-拥有项目全貌 + 当前任务状态，开始工作
-```
-
-### 为什么不会卡死
-- INDEX.md 不存在 → 兜底到目录扫描 + 逐个读取
-- 目录也不存在 → 跳过预热，Plan 文件和 Handoff Context 仍然可达
-- CLAUDE.md 始终被加载 → 指针始终可达
-- HANDOFF_PROTOCOL.md 第 0 步的初始化确保下次不再缺失基础设施
+详细预热流程见 `/continue-handoff` skill 定义文件，此处不再重复。
