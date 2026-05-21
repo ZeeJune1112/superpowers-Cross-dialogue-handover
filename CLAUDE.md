@@ -1,21 +1,62 @@
-## 预热协议（新窗口启动时）
+# CLAUDE.md — 12-rule template
 
-新窗口通过 `/continue-handoff` 触发状态恢复，其 skill 定义文件包含完整的预热逻辑（索引读取 → 遗漏检测 → Plan 挂载 → 工作区预热）。此处仅保留 CLAUDE.md 层面的兜底规则，详细步骤以 `/continue-handoff` skill 为准。
+These rules apply to every task in this project unless explicitly overridden.
+Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
 
-**兜底**：若 `/continue-handoff` skill 不可用或 INDEX.md 为空，扫描 `docs/superpowers/specs/`、`plans/`、`architecture/features/`、`architecture/pitfalls/` 四个目录，逐个读取所有 .md 文件在内存中构建临时索引。
+## Rule 1 — Think Before Coding
+State assumptions explicitly. If uncertain, ask rather than guess.
+Present multiple interpretations when ambiguity exists.
+Push back when a simpler approach exists.
+Stop when confused. Name what's unclear.
 
-注：首个窗口无需预热。
+## Rule 2 — Simplicity First
+Minimum code that solves the problem. Nothing speculative.
+No features beyond what was asked. No abstractions for single-use code.
+Test: would a senior engineer say this is overcomplicated? If yes, simplify.
 
-## 文档语言约定
+## Rule 3 — Surgical Changes
+Touch only what you must. Clean up only your own mess.
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor what isn't broken. Match existing style.
 
-Superpowers 流程产出的**所有文档正文**必须使用中文，包括但不限于：spec（设计规格）、plan（实现计划，含 Handoff Context 交接记录）、features（功能归档）、pitfalls（坑点归档）。代码片段、类名、函数名、文件路径、Git 分支名可保留英文。
+## Rule 4 — Goal-Driven Execution
+Define success criteria. Loop until verified.
+Don't follow steps. Define success and iterate.
+Strong success criteria let you loop independently.
 
-原因：用户母语为中文，英文阅读有障碍。
+## Rule 5 — Use the model only for judgment calls
+Use me for: classification, drafting, summarization, extraction.
+Do NOT use me for: routing, retries, deterministic transforms.
+If code can answer, code answers.
 
-## 核心交割纪律（研发红线）
+## Rule 6 — Token budgets are not advisory
+Per-task: 4,000 tokens. Per-session: 30,000 tokens.
+If approaching budget, summarize and start fresh.
+Surface the breach. Do not silently overrun.
 
-- **交棒前置动作**：Plan 执行完毕、功能确认完成后，必须执行 `docs/superpowers/architecture/HANDOFF_PROTOCOL.md` 定义的记忆固化协议（5 步）。
-- **交棒硬约束**：HANDOFF_PROTOCOL 未执行完毕前，**禁止**执行 `/handoff`。若用户在此期间请求 `/handoff`，AI 必须拦截并告知"记忆固化尚未完成"，先执行 HANDOFF_PROTOCOL，再执行 /handoff。
-- **/handoff 用途**：将当前窗口的动态进度写入 plan 的 Handoff Context，供下个窗口恢复。**不是**知识归档工具——归档交给 HANDOFF_PROTOCOL。
-- **严禁抢跑**：HANDOFF_PROTOCOL 未完成前，禁止向用户宣告任务结束。
-- **提交责任**：HANDOFF_PROTOCOL 执行完后，将 `docs/superpowers/` 目录变更以独立 commit 提交到 Git，确保知识固化持久化。
+## Rule 7 — Surface conflicts, don't average them
+If two patterns contradict, pick one (more recent / more tested).
+Explain why. Flag the other for cleanup.
+Don't blend conflicting patterns.
+
+## Rule 8 — Read before you write
+Before adding code, read exports, immediate callers, shared utilities.
+"Looks orthogonal" is dangerous. If unsure why code is structured a way, ask.
+
+## Rule 9 — Tests verify intent, not just behavior
+Tests must encode WHY behavior matters, not just WHAT it does.
+A test that can't fail when business logic changes is wrong.
+
+## Rule 10 — Checkpoint after every significant step
+Summarize what was done, what's verified, what's left.
+Don't continue from a state you can't describe back.
+If you lose track, stop and restate.
+
+## Rule 11 — Match the codebase's conventions, even if you disagree
+Conformance > taste inside the codebase.
+If you genuinely think a convention is harmful, surface it. Don't fork silently.
+
+## Rule 12 — Fail loud
+"Completed" is wrong if anything was skipped silently.
+"Tests pass" is wrong if any were skipped.
+Default to surfacing uncertainty, not hiding it.
